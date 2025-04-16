@@ -1,1 +1,107 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
+"""
+بوت تليجرام متكامل - إصدار 1.0
+مخصص للرفع على GitHub
+"""
+
+import os
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Updater,
+    CommandHandler,
+    CallbackContext,
+    CallbackQueryHandler,
+    MessageHandler,
+    Filters
+)
+
+# ------ إعدادات أساسية ------
+TOKEN = os.getenv('7868580704:AAEdu4oxJcGJmExFbsEY6JX2eOilTg60l6Y')  # سيتم قراءته من متغيرات البيئة
+ADMIN_ID = 7868580704  # ضع رقمك هنا
+LOG_FILE = 'bot.log'
+
+# ------ إعداد السجل ------
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO,
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# ------ أوامر البوت ------
+def start(update: Update, context: CallbackContext):
+    """معالجة أمر /start"""
+    user = update.effective_user
+    keyboard = [
+        [InlineKeyboardButton("🎯 توقع مباراة", callback_data='predict')],
+        [InlineKeyboardButton("📊 إحصائيات", callback_data='stats')],
+        [InlineKeyboardButton("ℹ️ المساعدة", callback_data='help')]
+    ]
+    update.message.reply_text(
+        f"مرحباً {user.first_name}! 👋\nاختر أحد الخيارات:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+def help_command(update: Update, context: CallbackContext):
+    """معالجة أمر /help"""
+    help_text = """
+    🆘 <b>كيفية الاستخدام:</b>
+    
+    /start - بدء تشغيل البوت
+    /predict - توقع مباراة
+    /stats - عرض الإحصائيات
+    
+    💡 <i>يمكنك استخدام الأزرار أو الأوامر مباشرة</i>
+    """
+    update.message.reply_text(help_text, parse_mode='HTML')
+
+# ------ معالجة الأزرار ------
+def button_handler(update: Update, context: CallbackContext):
+    """معالجة ضغطات الأزرار"""
+    query = update.callback_query
+    query.answer()
+    
+    if query.data == 'predict':
+        query.edit_message_text("أرسل اسم المباراة (مثال: الأهلي ضد الزمالك)")
+        context.user_data['awaiting'] = 'prediction'
+    elif query.data == 'stats':
+        query.edit_message_text("📈 الإحصائيات قريباً...")
+    elif query.data == 'help':
+        help_command(update, context)
+
+# ------ معالجة الرسائل ------
+def handle_message(update: Update, context: CallbackContext):
+    """معالجة الرسائل النصية"""
+    if context.user_data.get('awaiting') == 'prediction':
+        match = update.message.text
+        update.message.reply_text(f"جارٍ تحليل المباراة: {match}...")
+        # هنا يمكنك إضافة تحليل الذكاء الاصطناعي
+        context.user_data['awaiting'] = None
+
+# ------ التشغيل الرئيسي ------
+def main():
+    """تشغيل البوت"""
+    try:
+        updater = Updater(TOKEN)
+        dp = updater.dispatcher
+        
+        # تسجيل المعالجات
+        dp.add_handler(CommandHandler("start", start))
+        dp.add_handler(CommandHandler("help", help_command))
+        dp.add_handler(CallbackQueryHandler(button_handler))
+        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+        
+        logger.info("✅ البوت يعمل الآن...")
+        updater.start_polling()
+        updater.idle()
+    except Exception as e:
+        logger.error(f"❌ خطأ: {e}")
+
+if __name__ == '__main__':
+    main()
